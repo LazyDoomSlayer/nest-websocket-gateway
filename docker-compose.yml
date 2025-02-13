@@ -1,0 +1,15 @@
+networks:
+  proxy-network:
+    external: true
+
+services:
+  nest-app:
+    build: .
+    container_name: nest-app
+    restart: always
+    ports:
+      - '3000:3000'
+    networks:
+      - proxy-network
+    environment:
+      - NODE_ENV=production
