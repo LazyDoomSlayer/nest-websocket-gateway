@@ -6,7 +6,10 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.useWebSocketAdapter(new IoAdapter(app));
   app.enableCors({
-    origin: '*',
+    origin: [
+      'https://nfc-handler.lazydoomslayer.dev',
+      'https://nfc-reader.lazydoomslayer.dev',
+    ],
     methods: ['GET', 'POST'],
     credentials: true,
   });

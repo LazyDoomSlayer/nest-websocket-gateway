@@ -13,3 +13,4 @@ services:
       - proxy-network
     environment:
       - NODE_ENV=production
+      - WS_PORT=3000
