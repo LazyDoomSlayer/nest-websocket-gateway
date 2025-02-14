@@ -17,10 +17,11 @@ import * as jwt from 'jsonwebtoken';
 @Injectable()
 @WebSocketGateway({
   cors: {
-    origin: [
-      'https://nfc-handler.lazydoomslayer.dev',
-      'https://nfc-reader.lazydoomslayer.dev',
-    ],
+    origin: '*',
+    //   [
+    //   'https://nfc-handler.lazydoomslayer.dev',
+    //   'https://nfc-reader.lazydoomslayer.dev',
+    // ],
     methods: ['GET', 'POST'],
     credentials: true,
   },
@@ -39,41 +40,42 @@ export class WebsocketGateway
   }
 
   handleConnection(client: Socket) {
-    try {
-      const token = client.handshake.auth?.token;
-      const device = client.handshake.auth?.device;
-      this.logger.debug(
-        `Incoming connection. Token: ${token}, Device: ${device}`,
-      );
-
-      if (!token) {
-        throw new UnauthorizedException('No token provided');
-      }
-
-      const decodedToken: any = jwt.decode(token);
-      this.logger.debug(`Decoded token: ${JSON.stringify(decodedToken)}`);
-      if (!decodedToken || !decodedToken.sub) {
-        throw new UnauthorizedException('Invalid token format');
-      }
-
-      const userId = decodedToken.sub;
-      const socketId = client.id;
-      this.logger.log(`✅ Client connected: ${userId} (Socket: ${socketId})`);
-
-      client.data.userId = userId;
-      client.join(userId);
-
-      if (device) {
-        client.data.device = device;
-        client.join(device);
-      }
-
-      const joinedRooms = Array.from(client.rooms).join(', ');
-      this.logger.debug(`Client ${socketId} rooms: ${joinedRooms}`);
-    } catch (error: any) {
-      this.logger.warn(`❌ Connection denied: ${error.message}`);
-      client.disconnect();
-    }
+    console.log(client);
+    // try {
+    //   const token = client.handshake.auth?.token;
+    //   const device = client.handshake.auth?.device;
+    //   this.logger.debug(
+    //     `Incoming connection. Token: ${token}, Device: ${device}`,
+    //   );
+    //
+    //   if (!token) {
+    //     throw new UnauthorizedException('No token provided');
+    //   }
+    //
+    //   const decodedToken: any = jwt.decode(token);
+    //   this.logger.debug(`Decoded token: ${JSON.stringify(decodedToken)}`);
+    //   if (!decodedToken || !decodedToken.sub) {
+    //     throw new UnauthorizedException('Invalid token format');
+    //   }
+    //
+    //   const userId = decodedToken.sub;
+    //   const socketId = client.id;
+    //   this.logger.log(`✅ Client connected: ${userId} (Socket: ${socketId})`);
+    //
+    //   client.data.userId = userId;
+    //   client.join(userId);
+    //
+    //   if (device) {
+    //     client.data.device = device;
+    //     client.join(device);
+    //   }
+    //
+    //   const joinedRooms = Array.from(client.rooms).join(', ');
+    //   this.logger.debug(`Client ${socketId} rooms: ${joinedRooms}`);
+    // } catch (error: any) {
+    //   this.logger.warn(`❌ Connection denied: ${error.message}`);
+    //   client.disconnect();
+    // }
   }
 
   handleDisconnect(client: Socket) {
