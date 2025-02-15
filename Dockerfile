@@ -1,23 +1,17 @@
-# Use official Node.js image
 FROM node:18-alpine
 
-# Set working directory
-WORKDIR /app
+RUN npm install -g pnpm @nestjs/cli
 
-RUN npm install -g pnpm
+WORKDIR /app
 
 COPY package.json pnpm-lock.yaml ./
 
-RUN pnpm install --prod
+RUN pnpm install --frozen-lockfile --prod
 
-# Copy source files
 COPY . .
 
-# Build the app
-RUN npm run build
+RUN nest build
 
-# Expose port
 EXPOSE 3000
 
-# Start the application
 CMD ["node", "dist/main.js"]
