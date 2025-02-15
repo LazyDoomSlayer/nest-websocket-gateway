@@ -1,120 +1,158 @@
 import {
+  ConnectedSocket,
+  MessageBody,
+  SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
-  SubscribeMessage,
-  MessageBody,
-  ConnectedSocket,
-} from '@nestjs/websockets';
-import {
-  OnGatewayConnection,
-  OnGatewayDisconnect,
-  OnGatewayInit,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
-import * as jwt from 'jsonwebtoken';
+import { plainToInstance } from 'class-transformer';
+import { WebsocketAuthObjectDto } from './dtos/websocket-auth.dto';
+import { validate } from 'class-validator';
+import getSubFromToken from 'src/common/token-helper';
+import { NfcScanDTO } from './dtos/nfc-scan.dto';
+import { EWebsocketClient } from './websocket-client.enum';
+import { WebSocketClientData } from './websocket-client.interface';
+import { NfcResponseDTO } from './dtos/nfc-response.dto';
 
 @Injectable()
 @WebSocketGateway({
-  // cors: {
-  //   origin: '*',
-  //   //   [
-  //   //   'https://nfc-handler.lazydoomslayer.dev',
-  //   //   'https://nfc-reader.lazydoomslayer.dev',
-  //   // ],
-  //   methods: ['GET', 'POST'],
-  //   credentials: true,
-  // },
   transports: ['websocket'],
 })
-export class WebsocketGateway
-  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
-{
+export class WebsocketGateway {
   private readonly logger = new Logger(WebsocketGateway.name);
 
   @WebSocketServer()
   server: Server;
 
-  afterInit(_server: Server) {
+  afterInit(): void {
     this.logger.log('WebSocket server initialized with WSS');
   }
 
-  handleConnection(client: Socket) {
-    console.log(client);
-    // try {
-    //   const token = client.handshake.auth?.token;
-    //   const device = client.handshake.auth?.device;
-    //   this.logger.debug(
-    //     `Incoming connection. Token: ${token}, Device: ${device}`,
-    //   );
-    //
-    //   if (!token) {
-    //     throw new UnauthorizedException('No token provided');
-    //   }
-    //
-    //   const decodedToken: any = jwt.decode(token);
-    //   this.logger.debug(`Decoded token: ${JSON.stringify(decodedToken)}`);
-    //   if (!decodedToken || !decodedToken.sub) {
-    //     throw new UnauthorizedException('Invalid token format');
-    //   }
-    //
-    //   const userId = decodedToken.sub;
-    //   const socketId = client.id;
-    //   this.logger.log(`✅ Client connected: ${userId} (Socket: ${socketId})`);
-    //
-    //   client.data.userId = userId;
-    //   client.join(userId);
-    //
-    //   if (device) {
-    //     client.data.device = device;
-    //     client.join(device);
-    //   }
-    //
-    //   const joinedRooms = Array.from(client.rooms).join(', ');
-    //   this.logger.debug(`Client ${socketId} rooms: ${joinedRooms}`);
-    // } catch (error: any) {
-    //   this.logger.warn(`❌ Connection denied: ${error.message}`);
-    //   client.disconnect();
-    // }
+  async handleConnection(socketClient: Socket): Promise<void> {
+    try {
+      const websocketAuthObject = socketClient.handshake.auth;
+
+      const dtoInstance = plainToInstance(
+        WebsocketAuthObjectDto,
+        websocketAuthObject,
+      );
+      const errors = await validate(dtoInstance);
+
+      if (errors.length > 0) {
+        console.error('Validation failed:', errors);
+        socketClient.disconnect();
+        return;
+      }
+
+      const { token, client } = dtoInstance;
+      if (!token) {
+        throw new UnauthorizedException('No token provided');
+      }
+
+      const sub = getSubFromToken(token);
+      if (!sub) {
+        throw new UnauthorizedException('Token not valid');
+      }
+
+      socketClient.data = {
+        sub,
+        client,
+      };
+
+      await socketClient.join(sub);
+
+      if (client) {
+        await socketClient.join(client);
+      }
+    } catch (error) {
+      console.error(error);
+      socketClient.disconnect();
+    }
+  }
+
+  @SubscribeMessage('nfc-scan')
+  async handleNfcScan(
+    @MessageBody() payload: any,
+    @ConnectedSocket() socketClient: Socket,
+  ) {
+    try {
+      const dtoInstance = plainToInstance(NfcScanDTO, payload);
+      const errors = await validate(dtoInstance);
+
+      if (errors.length > 0) {
+        this.logger.error('Validation failed:', errors);
+        socketClient.emit('error', { message: 'Invalid payload', errors });
+        return;
+      }
+
+      const {
+        deviceExtendedUniqueIdentifier,
+        applicationExtendedUniqueIdentifier,
+      } = dtoInstance;
+      const clientData = socketClient.data as WebSocketClientData;
+
+      if (clientData.client === EWebsocketClient.READER) {
+        socketClient.to(EWebsocketClient.HANDLER).emit('nfc-scan', {
+          from: clientData.sub,
+          deviceExtendedUniqueIdentifier,
+          applicationExtendedUniqueIdentifier,
+        });
+        return;
+      }
+
+      socketClient.emit('error', {
+        message: 'Only READER clients can send NFC scan data',
+      });
+    } catch (error) {
+      this.logger.error('Error processing NFC scan:', error);
+      socketClient.emit('error', { message: 'Internal server error' });
+    }
+  }
+
+  @SubscribeMessage('nfc-response')
+  async handleNfcResponse(
+    @MessageBody() payload: any,
+    @ConnectedSocket() socketClient: Socket,
+  ) {
+    try {
+      const dtoInstance = plainToInstance(NfcResponseDTO, payload);
+      const errors = await validate(dtoInstance);
+
+      if (errors.length > 0) {
+        this.logger.error('Validation failed:', errors);
+        socketClient.emit('error', { message: 'Invalid payload', errors });
+        return;
+      }
+
+      const { status } = dtoInstance;
+
+      if (!status) {
+        socketClient.emit('error', { message: 'Invalid response format' });
+        return;
+      }
+
+      const clientData = socketClient.data as WebSocketClientData;
+
+      if (clientData.client === EWebsocketClient.HANDLER) {
+        socketClient.to(EWebsocketClient.READER).emit('nfc-response', {
+          from: clientData.sub,
+          ...dtoInstance,
+        });
+        return;
+      }
+
+      socketClient.emit('error', {
+        message: 'Only HANDLER clients can send NFC response data',
+      });
+    } catch (error) {
+      this.logger.error('Error processing NFC response:', error);
+      socketClient.emit('error', { message: 'Internal server error' });
+    }
   }
 
   handleDisconnect(client: Socket) {
     this.logger.log(`Client disconnected: ${client.id}`);
-  }
-
-  @SubscribeMessage('private-message')
-  handlePrivateMessage(
-    @MessageBody() data: { recipientId: string; message: string },
-    @ConnectedSocket() client: Socket,
-  ) {
-    const senderId = client.data.userId;
-    if (!senderId || !data.recipientId) {
-      this.logger.warn(
-        `Missing sender or recipient info. Sender: ${senderId}, Recipient: ${data.recipientId}`,
-      );
-      return;
-    }
-
-    this.logger.log(
-      `📩 Private message from ${senderId} to ${data.recipientId}: ${data.message}`,
-    );
-
-    const rooms = this.server.sockets.adapter.rooms;
-    if (rooms.has(data.recipientId)) {
-      const socketsInRoom = Array.from(rooms.get(data.recipientId) || []);
-      this.logger.debug(
-        `Room "${data.recipientId}" exists. Connected sockets: ${socketsInRoom.join(', ')}`,
-      );
-    } else {
-      this.logger.warn(
-        `Room "${data.recipientId}" does not exist! Message may not be delivered.`,
-      );
-    }
-
-    this.server.to(data.recipientId).emit('private-message', {
-      sender: senderId,
-      message: data.message,
-    });
-    this.logger.debug(`Emitted message to room: ${data.recipientId}`);
   }
 }
