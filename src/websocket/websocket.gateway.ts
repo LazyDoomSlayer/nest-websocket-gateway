@@ -16,15 +16,15 @@ import * as jwt from 'jsonwebtoken';
 
 @Injectable()
 @WebSocketGateway({
-  cors: {
-    origin: '*',
-    //   [
-    //   'https://nfc-handler.lazydoomslayer.dev',
-    //   'https://nfc-reader.lazydoomslayer.dev',
-    // ],
-    methods: ['GET', 'POST'],
-    credentials: true,
-  },
+  // cors: {
+  //   origin: '*',
+  //   //   [
+  //   //   'https://nfc-handler.lazydoomslayer.dev',
+  //   //   'https://nfc-reader.lazydoomslayer.dev',
+  //   // ],
+  //   methods: ['GET', 'POST'],
+  //   credentials: true,
+  // },
   transports: ['websocket'],
 })
 export class WebsocketGateway

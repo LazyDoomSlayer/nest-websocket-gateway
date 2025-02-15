@@ -1,28 +1,23 @@
-FROM node:18-alpine AS builder
-
-WORKDIR /usr/src/app
-
-RUN npm install -g pnpm
-
-COPY package.json pnpm-lock.yaml ./
-
-RUN pnpm install
-
-COPY . .
-
-RUN pnpm run build
-
-
+# Use official Node.js image
 FROM node:18-alpine
 
-WORKDIR /usr/src/app
+# Set working directory
+WORKDIR /app
 
 RUN npm install -g pnpm
 
 COPY package.json pnpm-lock.yaml ./
+
 RUN pnpm install --prod
 
-COPY --from=builder /usr/src/app/dist ./dist
+# Copy source files
+COPY . .
 
+# Build the app
+RUN npm run build
+
+# Expose port
 EXPOSE 3000
+
+# Start the application
 CMD ["node", "dist/main.js"]
