@@ -1,5 +1,5 @@
 import { IsString, IsNotEmpty, IsEnum } from 'class-validator';
-import { EWebsocketClient } from '../websocket-client.enum.ts dtos/websocket-client.enum';
+import { EWebsocketClient } from './websocket-client.enum';
 
 export class WebsocketAuthObjectDto {
   @IsString()
