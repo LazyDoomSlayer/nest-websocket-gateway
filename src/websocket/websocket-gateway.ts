@@ -6,19 +6,27 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
+
 import { Injectable, Logger } from '@nestjs/common';
-import { plainToInstance } from 'class-transformer';
-import { validate } from 'class-validator';
+
 import { NfcScanDTO } from './dtos/nfc-scan.dto';
 import { NfcResponseDTO } from './dtos/nfc-response.dto';
+
 import { WebsocketAuthService } from './services/websocket-auth.service';
+import { WebsocketValidationService } from './services/websocket-validation.service';
+
+import { WebSocketClientData } from './dtos/websocket-client.interface';
+import { EWebsocketClient } from './dtos/websocket-client.enum';
 
 @Injectable()
 @WebSocketGateway({
   transports: ['websocket'],
 })
 export class WebsocketGateway {
-  constructor(private readonly websocketAuthService: WebsocketAuthService) {}
+  constructor(
+    private readonly websocketAuthService: WebsocketAuthService,
+    private readonly websocketValidationService: WebsocketValidationService,
+  ) {}
   private readonly logger = new Logger(WebsocketGateway.name);
 
   @WebSocketServer()
@@ -46,37 +54,26 @@ export class WebsocketGateway {
     @MessageBody() payload: any,
     @ConnectedSocket() socketClient: Socket,
   ) {
-    try {
-      const dtoInstance = plainToInstance(NfcScanDTO, payload);
-      const errors = await validate(dtoInstance);
+    const dtoInstance = await this.websocketValidationService.validatePayload(
+      NfcScanDTO,
+      payload,
+    );
+    if (!dtoInstance) {
+      socketClient.emit('error', { message: 'Invalid payload' });
+      return;
+    }
 
-      if (errors.length > 0) {
-        this.logger.error('Validation failed:', errors);
-        socketClient.emit('error', { message: 'Invalid payload', errors });
-        return;
-      }
+    const clientData = socketClient.data as WebSocketClientData;
 
-      const {
-        deviceExtendedUniqueIdentifier,
-        applicationExtendedUniqueIdentifier,
-      } = dtoInstance;
-      const clientData = socketClient.data as WebSocketClientData;
-
-      if (clientData.client === EWebsocketClient.READER) {
-        socketClient.to(EWebsocketClient.HANDLER).emit('nfc-scan', {
-          from: clientData.sub,
-          deviceExtendedUniqueIdentifier,
-          applicationExtendedUniqueIdentifier,
-        });
-        return;
-      }
-
+    if (clientData.client === EWebsocketClient.READER) {
+      socketClient.to(EWebsocketClient.HANDLER).emit('nfc-scan', {
+        from: clientData.sub,
+        ...dtoInstance,
+      });
+    } else {
       socketClient.emit('error', {
         message: 'Only READER clients can send NFC scan data',
       });
-    } catch (error) {
-      this.logger.error('Error processing NFC scan:', error);
-      socketClient.emit('error', { message: 'Internal server error' });
     }
   }
 
@@ -85,39 +82,26 @@ export class WebsocketGateway {
     @MessageBody() payload: any,
     @ConnectedSocket() socketClient: Socket,
   ) {
-    try {
-      const dtoInstance = plainToInstance(NfcResponseDTO, payload);
-      const errors = await validate(dtoInstance);
+    const dtoInstance = await this.websocketValidationService.validatePayload(
+      NfcResponseDTO,
+      payload,
+    );
+    if (!dtoInstance) {
+      socketClient.emit('error', { message: 'Invalid payload' });
+      return;
+    }
 
-      if (errors.length > 0) {
-        this.logger.error('Validation failed:', errors);
-        socketClient.emit('error', { message: 'Invalid payload', errors });
-        return;
-      }
+    const clientData = socketClient.data as WebSocketClientData;
 
-      const { status } = dtoInstance;
-
-      if (!status) {
-        socketClient.emit('error', { message: 'Invalid response format' });
-        return;
-      }
-
-      const clientData = socketClient.data as WebSocketClientData;
-
-      if (clientData.client === EWebsocketClient.HANDLER) {
-        socketClient.to(EWebsocketClient.READER).emit('nfc-response', {
-          from: clientData.sub,
-          ...dtoInstance,
-        });
-        return;
-      }
-
+    if (clientData.client === EWebsocketClient.HANDLER) {
+      socketClient.to(EWebsocketClient.READER).emit('nfc-response', {
+        from: clientData.sub,
+        ...dtoInstance,
+      });
+    } else {
       socketClient.emit('error', {
         message: 'Only HANDLER clients can send NFC response data',
       });
-    } catch (error) {
-      this.logger.error('Error processing NFC response:', error);
-      socketClient.emit('error', { message: 'Internal server error' });
     }
   }
 

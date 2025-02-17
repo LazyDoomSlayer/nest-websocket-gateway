@@ -1,9 +1,13 @@
-import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { Socket } from 'socket.io';
+
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+
 import { WebSocketClientData } from '../dtos/websocket-client.interface';
-import { plainToInstance } from 'class-transformer';
 import { WebsocketAuthObjectDto } from '../dtos/websocket-auth.dto';
+
 import { validate } from 'class-validator';
+import { plainToInstance } from 'class-transformer';
+
 import getSubFromToken from 'src/common/token-helper';
 
 @Injectable()
