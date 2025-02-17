@@ -8,5 +8,5 @@ export class NfcResponseDTO {
   message: string;
 
   @IsEnum(ENFCScanStatus)
-  status: string;
+  status: ENFCScanStatus;
 }

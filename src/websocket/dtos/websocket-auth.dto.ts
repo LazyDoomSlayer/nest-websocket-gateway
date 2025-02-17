@@ -7,5 +7,5 @@ export class WebsocketAuthObjectDto {
   token: string;
 
   @IsEnum(EWebsocketClient)
-  client: string;
+  client: EWebsocketClient;
 }
