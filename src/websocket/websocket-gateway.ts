@@ -6,21 +6,19 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
-import { WebsocketAuthObjectDto } from './dtos/websocket-auth.dto';
 import { validate } from 'class-validator';
-import getSubFromToken from 'src/common/token-helper';
 import { NfcScanDTO } from './dtos/nfc-scan.dto';
-import { EWebsocketClient } from './websocket-client.enum';
-import { WebSocketClientData } from './websocket-client.interface';
 import { NfcResponseDTO } from './dtos/nfc-response.dto';
+import { WebsocketAuthService } from './services/websocket-auth.service';
 
 @Injectable()
 @WebSocketGateway({
   transports: ['websocket'],
 })
 export class WebsocketGateway {
+  constructor(private readonly websocketAuthService: WebsocketAuthService) {}
   private readonly logger = new Logger(WebsocketGateway.name);
 
   @WebSocketServer()
@@ -31,44 +29,15 @@ export class WebsocketGateway {
   }
 
   async handleConnection(socketClient: Socket): Promise<void> {
-    try {
-      const websocketAuthObject = socketClient.handshake.auth;
+    const clientData =
+      await this.websocketAuthService.validateClient(socketClient);
+    if (!clientData) return;
 
-      const dtoInstance = plainToInstance(
-        WebsocketAuthObjectDto,
-        websocketAuthObject,
-      );
-      const errors = await validate(dtoInstance);
+    socketClient.data = clientData;
+    await socketClient.join(clientData.sub);
 
-      if (errors.length > 0) {
-        console.error('Validation failed:', errors);
-        socketClient.disconnect();
-        return;
-      }
-
-      const { token, client } = dtoInstance;
-      if (!token) {
-        throw new UnauthorizedException('No token provided');
-      }
-
-      const sub = getSubFromToken(token);
-      if (!sub) {
-        throw new UnauthorizedException('Token not valid');
-      }
-
-      socketClient.data = {
-        sub,
-        client,
-      };
-
-      await socketClient.join(sub);
-
-      if (client) {
-        await socketClient.join(client);
-      }
-    } catch (error) {
-      console.error(error);
-      socketClient.disconnect();
+    if (clientData.client) {
+      await socketClient.join(clientData.client);
     }
   }
 
