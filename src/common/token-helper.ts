@@ -1,14 +1,19 @@
 import * as jwt from 'jsonwebtoken';
 
+import { Logger } from '@nestjs/common';
+
 import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
+
 import { TokenStctureDto } from 'src/websocket/dtos/token-structure.dto';
+
+const logger = new Logger('getSubFromToken');
 
 export default function getSubFromToken(token: string): string | null {
   try {
     const decoded = jwt.decode(token);
     if (!decoded || typeof decoded !== 'object') {
-      console.error('Invalid JWT structure');
+      logger.error(`Invalid JWT structure for token: [REDACTED]`);
       return null;
     }
 
@@ -16,13 +21,13 @@ export default function getSubFromToken(token: string): string | null {
     const errors = validateSync(dtoInstance);
 
     if (errors.length > 0) {
-      console.error('Invalid token structure:', errors);
+      logger.error(`Invalid token structure: ${JSON.stringify(errors)}`);
       return null;
     }
 
     return dtoInstance.sub;
   } catch (e) {
-    console.error('Failed to decode JWT:', e);
+    logger.error('Failed to decode JWT', e instanceof Error ? e.stack : e);
     return null;
   }
 }

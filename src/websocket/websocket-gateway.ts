@@ -37,15 +37,23 @@ export class WebsocketGateway {
   }
 
   async handleConnection(socketClient: Socket): Promise<void> {
+    this.logger.log(`Client connected: ${socketClient.id}`);
     const clientData =
       await this.websocketAuthService.validateClient(socketClient);
-    if (!clientData) return;
+    if (!clientData) {
+      this.logger.warn(`Client validation failed: ${socketClient.id}`);
+      return;
+    }
 
     socketClient.data = clientData;
     await socketClient.join(clientData.sub);
+    this.logger.log(`Client ${socketClient.id} joined room ${clientData.sub}`);
 
     if (clientData.client) {
       await socketClient.join(clientData.client);
+      this.logger.log(
+        `Client ${socketClient.id} joined room ${clientData.client}`,
+      );
     }
   }
 
@@ -54,26 +62,41 @@ export class WebsocketGateway {
     @MessageBody() payload: any,
     @ConnectedSocket() socketClient: Socket,
   ) {
+    this.logger.debug(
+      `Received NFC scan payload from ${socketClient.id}: ${JSON.stringify(payload)}`,
+    );
     const dtoInstance = await this.websocketValidationService.validatePayload(
       NfcScanDTO,
       payload,
     );
+
     if (!dtoInstance) {
+      this.logger.warn(`Invalid NFC scan payload from ${socketClient.id}`);
       socketClient.emit('error', { message: 'Invalid payload' });
       return;
     }
 
     const clientData = socketClient.data as WebSocketClientData;
+    try {
+      if (clientData.client !== EWebsocketClient.READER) {
+        this.logger.warn(
+          `Unauthorized NFC scan attempt from client ${socketClient.id}`,
+        );
+        socketClient.emit('error', {
+          message: 'Only READER clients can send NFC scan data',
+        });
+        return;
+      }
 
-    if (clientData.client === EWebsocketClient.READER) {
       socketClient.to(EWebsocketClient.HANDLER).emit('nfc-scan', {
         from: clientData.sub,
         ...dtoInstance,
       });
-    } else {
-      socketClient.emit('error', {
-        message: 'Only READER clients can send NFC scan data',
-      });
+      this.logger.log(
+        `NFC scan data forwarded from ${clientData.sub} to HANDLER`,
+      );
+    } catch (_error) {
+      this.logger.error(`Error handling NFC scan from ${clientData.sub}`);
     }
   }
 
@@ -82,26 +105,41 @@ export class WebsocketGateway {
     @MessageBody() payload: any,
     @ConnectedSocket() socketClient: Socket,
   ) {
+    this.logger.debug(
+      `Received NFC response payload from ${socketClient.id}: ${JSON.stringify(payload)}`,
+    );
     const dtoInstance = await this.websocketValidationService.validatePayload(
       NfcResponseDTO,
       payload,
     );
+
     if (!dtoInstance) {
+      this.logger.warn(`Invalid NFC response payload from ${socketClient.id}`);
       socketClient.emit('error', { message: 'Invalid payload' });
       return;
     }
 
     const clientData = socketClient.data as WebSocketClientData;
+    try {
+      if (clientData.client !== EWebsocketClient.HANDLER) {
+        this.logger.warn(
+          `Unauthorized NFC response attempt from client ${socketClient.id}`,
+        );
+        socketClient.emit('error', {
+          message: 'Only HANDLER clients can send NFC response data',
+        });
+        return;
+      }
 
-    if (clientData.client === EWebsocketClient.HANDLER) {
       socketClient.to(EWebsocketClient.READER).emit('nfc-response', {
         from: clientData.sub,
         ...dtoInstance,
       });
-    } else {
-      socketClient.emit('error', {
-        message: 'Only HANDLER clients can send NFC response data',
-      });
+      this.logger.log(
+        `NFC response data forwarded from ${clientData.sub} to READER`,
+      );
+    } catch (_error) {
+      this.logger.error(`Error handling NFC response from ${clientData.sub}`);
     }
   }
 

@@ -11,14 +11,21 @@ export class WebsocketValidationService {
     dtoClass: new () => T,
     payload: any,
   ): Promise<T | null> {
+    this.logger.debug(
+      `Validating payload for DTO ${dtoClass.name}. Payload: ${JSON.stringify(payload)}`,
+    );
+
     const dtoInstance = plainToInstance(dtoClass, payload);
     const errors = await validate(dtoInstance as object);
 
     if (errors.length > 0) {
-      this.logger.error('Validation failed:', errors);
+      this.logger.error(
+        `Validation failed for DTO ${dtoClass.name}. Errors: ${JSON.stringify(errors)}`,
+      );
       return null;
     }
 
+    this.logger.debug(`Payload validation successful for DTO ${dtoClass.name}`);
     return dtoInstance;
   }
 }
