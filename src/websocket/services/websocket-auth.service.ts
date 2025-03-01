@@ -8,8 +8,6 @@ import { WebsocketAuthObjectDto } from '../dtos/websocket-auth.dto';
 import { validate } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
 
-import getSubFromToken from 'src/common/token-helper';
-
 @Injectable()
 export class WebsocketAuthService {
   private readonly logger = new Logger(WebsocketAuthService.name);
@@ -43,8 +41,10 @@ export class WebsocketAuthService {
         throw new UnauthorizedException('No token provided');
       }
 
-      const sub = getSubFromToken(token);
-      if (!sub) {
+      // TODO: remove not needed after adding guards
+      const dummyYes = true;
+      const sub = 'Some';
+      if (dummyYes) {
         this.logger.error(
           `Authentication error for client ${socketClient.id}: Token not valid`,
         );
