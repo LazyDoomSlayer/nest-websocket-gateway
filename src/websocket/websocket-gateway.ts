@@ -38,23 +38,27 @@ export class WebsocketGateway {
 
   async handleConnection(socketClient: Socket): Promise<void> {
     this.logger.log(`Client connected: ${socketClient.id}`);
-    const clientData =
-      await this.websocketAuthService.validateClient(socketClient);
-    if (!clientData) {
-      this.logger.warn(`Client validation failed: ${socketClient.id}`);
-      return;
-    }
 
-    socketClient.data = clientData;
-    await socketClient.join(clientData.sub);
-    this.logger.log(`Client ${socketClient.id} joined room ${clientData.sub}`);
+    // TODO: add database to search for session by user and experations
+    // TODO: check for session.exp to be valid
 
-    if (clientData.client) {
-      await socketClient.join(clientData.client);
-      this.logger.log(
-        `Client ${socketClient.id} joined room ${clientData.client}`,
-      );
-    }
+    //   const clientData =
+    //     await this.websocketAuthService.validateClient(socketClient);
+    //   if (!clientData) {
+    //     this.logger.warn(`Client validation failed: ${socketClient.id}`);
+    //     return;
+    //   }
+    //
+    //   socketClient.data = clientData;
+    //   await socketClient.join(clientData.sub);
+    //   this.logger.log(`Client ${socketClient.id} joined room ${clientData.sub}`);
+    //
+    //   if (clientData.client) {
+    //     await socketClient.join(clientData.client);
+    //     this.logger.log(
+    //       `Client ${socketClient.id} joined room ${clientData.client}`,
+    //     );
+    //   }
   }
 
   @SubscribeMessage('nfc-scan')
