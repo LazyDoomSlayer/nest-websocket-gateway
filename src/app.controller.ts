@@ -1,8 +1,7 @@
 import { Controller, Get, UseGuards, Req, Res } from '@nestjs/common';
-import { JwtAuthGuard } from './guards/jwt.guard';
 import { Request, Response } from 'express';
-
-import { AuthUserDto } from './websocket/dtos/auth-user.dto';
+import { JwtAuthGuard } from './auth/guards/jwt.guard';
+import { AuthUserDto } from './auth/dtos/auth-user.dto';
 
 @Controller()
 export class AppController {

@@ -1,12 +1,13 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
-import { JwtStrategy } from './strategies/jwt.strategy';
-
 import { SessionsModule } from './sessions/sessions.module';
 import { WebsocketModule } from './websocket/websocket.module';
 
 import { Session } from './sessions/sessions.entity';
+import { AuthModule } from './auth/auth.module';
+import { RoomsModule } from './rooms/rooms.module';
+import { JwtStrategy } from './auth/strategies/jwt.strategy';
 
 @Module({
   imports: [
@@ -24,6 +25,8 @@ import { Session } from './sessions/sessions.entity';
     }),
     WebsocketModule,
     SessionsModule,
+    AuthModule,
+    RoomsModule,
   ],
   controllers: [],
   providers: [JwtStrategy],
