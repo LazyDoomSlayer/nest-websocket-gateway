@@ -22,6 +22,7 @@ import { EWebsocketClient } from './dtos/websocket-client.enum';
 import { SessionRepository } from 'src/sessions/session.repository';
 
 import { JwtService } from '@nestjs/jwt';
+import { RoomRepository } from 'src/rooms/room.repository';
 
 @Injectable()
 @WebSocketGateway({
@@ -33,6 +34,7 @@ export class WebsocketGateway
   constructor(
     private readonly websocketAuthService: WebsocketAuthService,
     private readonly sessionRepository: SessionRepository,
+    private readonly roomRepository: RoomRepository,
     private readonly websocketValidationService: WebsocketValidationService,
     private readonly jwtService: JwtService,
   ) {}
@@ -52,13 +54,13 @@ export class WebsocketGateway
         client.disconnect();
         return;
       }
+
       const decoded = this.jwtService.verify(token);
       const userId = decoded.sub;
       const deviceId = client.id;
 
       const activeSessions =
         await this.sessionRepository.findActiveSessions(userId);
-
       if (activeSessions.length >= 2) {
         client.emit('error', 'Max connections reached');
         client.disconnect();
@@ -67,7 +69,21 @@ export class WebsocketGateway
 
       await this.sessionRepository.createSession(userId, deviceId);
 
-      console.log(`User ${userId} connected with device ${deviceId}`);
+      let room = await this.roomRepository.findRoomByUser(userId);
+      if (!room) {
+        room = await this.roomRepository.createRoom(userId, deviceId);
+      } else if (!room.device2) {
+        await this.roomRepository.addSecondDevice(room.id, deviceId);
+      } else {
+        client.emit('error', 'Room is full');
+        client.disconnect();
+        return;
+      }
+
+      client.join(room.id);
+      console.log(
+        `User ${userId} joined room ${room.id} with device ${deviceId}`,
+      );
     } catch (error) {
       console.error('WebSocket authentication failed:', error.message);
       client.disconnect();
@@ -77,7 +93,15 @@ export class WebsocketGateway
   async handleDisconnect(client: Socket) {
     console.log(`Client disconnected: ${client.id}`);
 
+    const session = await this.sessionRepository.findActiveSessions(client.id);
+    if (!session) return;
+
     await this.sessionRepository.closeSession(client.id);
+
+    const room = await this.roomRepository.findRoomByUser(session.userId);
+    if (room) {
+      await this.roomRepository.removeDevice(room.id, client.id);
+    }
   }
 
   // async handleConnection(socketClient: Socket): Promise<void> {
