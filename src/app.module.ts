@@ -17,7 +17,7 @@ import { JwtStrategy } from './auth/strategies/jwt.strategy';
       port: 5432,
       username: 'postgres',
       password: 'postgres',
-      database: 'nest-websocket-gateway-tb',
+      database: 'nest-websocket-gateway-db',
       entities: [Session],
       // Migrations
       autoLoadEntities: false,
