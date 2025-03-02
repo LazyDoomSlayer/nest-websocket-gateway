@@ -14,15 +14,13 @@ import { Injectable, Logger } from '@nestjs/common';
 import { NfcScanDTO } from './dtos/nfc-scan.dto';
 import { NfcResponseDTO } from './dtos/nfc-response.dto';
 
-import { WebsocketAuthService } from './services/websocket-auth.service';
-import { WebsocketValidationService } from './services/websocket-validation.service';
-
 import { WebSocketClientData } from './dtos/websocket-client.interface';
 import { EWebsocketClient } from './dtos/websocket-client.enum';
 import { SessionRepository } from 'src/sessions/session.repository';
 
 import { JwtService } from '@nestjs/jwt';
 import { RoomRepository } from 'src/rooms/room.repository';
+import { WebsocketService } from './websocket.service';
 
 @Injectable()
 @WebSocketGateway({
@@ -32,11 +30,10 @@ export class WebsocketGateway
   implements OnGatewayConnection, OnGatewayDisconnect
 {
   constructor(
-    private readonly websocketAuthService: WebsocketAuthService,
     private readonly sessionRepository: SessionRepository,
     private readonly roomRepository: RoomRepository,
-    private readonly websocketValidationService: WebsocketValidationService,
     private readonly jwtService: JwtService,
+    private readonly websocketService: WebsocketService,
   ) {}
   private readonly logger = new Logger(WebsocketGateway.name);
 
@@ -137,7 +134,7 @@ export class WebsocketGateway
     this.logger.debug(
       `Received NFC scan payload from ${socketClient.id}: ${JSON.stringify(payload)}`,
     );
-    const dtoInstance = await this.websocketValidationService.validatePayload(
+    const dtoInstance = await this.websocketService.validatePayload(
       NfcScanDTO,
       payload,
     );
@@ -180,7 +177,7 @@ export class WebsocketGateway
     this.logger.debug(
       `Received NFC response payload from ${socketClient.id}: ${JSON.stringify(payload)}`,
     );
-    const dtoInstance = await this.websocketValidationService.validatePayload(
+    const dtoInstance = await this.websocketService.validatePayload(
       NfcResponseDTO,
       payload,
     );

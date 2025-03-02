@@ -4,8 +4,8 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 
 @Injectable()
-export class WebsocketValidationService {
-  private readonly logger = new Logger(WebsocketValidationService.name);
+export class WebsocketService {
+  private readonly logger = new Logger(WebsocketService.name);
 
   async validatePayload<T>(
     dtoClass: new () => T,

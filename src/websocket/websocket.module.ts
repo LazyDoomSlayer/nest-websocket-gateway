@@ -1,14 +1,12 @@
 import { Module } from '@nestjs/common';
+
 import { WebsocketGateway } from './websocket-gateway';
-import { WebsocketValidationService } from './services/websocket-validation.service';
-import { WebsocketAuthService } from './services/websocket-auth.service';
+import { AuthModule } from 'src/auth/auth.module';
+import { WebsocketService } from './websocket.service';
 
 @Module({
-  providers: [
-    WebsocketGateway,
-    WebsocketAuthService,
-    WebsocketValidationService,
-  ],
-  exports: [WebsocketValidationService, WebsocketAuthService],
+  imports: [AuthModule],
+  providers: [WebsocketGateway, WebsocketService],
+  exports: [WebsocketService],
 })
 export class WebsocketModule {}
