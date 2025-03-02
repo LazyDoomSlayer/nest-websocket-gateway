@@ -1,6 +1,8 @@
 import {
   ConnectedSocket,
   MessageBody,
+  OnGatewayConnection,
+  OnGatewayDisconnect,
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
@@ -17,15 +19,22 @@ import { WebsocketValidationService } from './services/websocket-validation.serv
 
 import { WebSocketClientData } from './dtos/websocket-client.interface';
 import { EWebsocketClient } from './dtos/websocket-client.enum';
+import { SessionRepository } from 'src/sessions/session.repository';
+
+import { JwtService } from '@nestjs/jwt';
 
 @Injectable()
 @WebSocketGateway({
   transports: ['websocket'],
 })
-export class WebsocketGateway {
+export class WebsocketGateway
+  implements OnGatewayConnection, OnGatewayDisconnect
+{
   constructor(
     private readonly websocketAuthService: WebsocketAuthService,
+    private readonly sessionRepository: SessionRepository,
     private readonly websocketValidationService: WebsocketValidationService,
+    private readonly jwtService: JwtService,
   ) {}
   private readonly logger = new Logger(WebsocketGateway.name);
 
@@ -36,30 +45,65 @@ export class WebsocketGateway {
     this.logger.log('WebSocket server initialized with WSS');
   }
 
-  async handleConnection(socketClient: Socket): Promise<void> {
-    this.logger.log(`Client connected: ${socketClient.id}`);
+  async handleConnection(client: Socket) {
+    try {
+      const token = client.handshake.headers.authorization?.split(' ')[1];
+      if (!token) {
+        client.disconnect();
+        return;
+      }
+      const decoded = this.jwtService.verify(token);
+      const userId = decoded.sub;
+      const deviceId = client.id;
 
-    // TODO: add database to search for session by user and experations
-    // TODO: check for session.exp to be valid
+      const activeSessions =
+        await this.sessionRepository.findActiveSessions(userId);
 
-    //   const clientData =
-    //     await this.websocketAuthService.validateClient(socketClient);
-    //   if (!clientData) {
-    //     this.logger.warn(`Client validation failed: ${socketClient.id}`);
-    //     return;
-    //   }
-    //
-    //   socketClient.data = clientData;
-    //   await socketClient.join(clientData.sub);
-    //   this.logger.log(`Client ${socketClient.id} joined room ${clientData.sub}`);
-    //
-    //   if (clientData.client) {
-    //     await socketClient.join(clientData.client);
-    //     this.logger.log(
-    //       `Client ${socketClient.id} joined room ${clientData.client}`,
-    //     );
-    //   }
+      if (activeSessions.length >= 2) {
+        client.emit('error', 'Max connections reached');
+        client.disconnect();
+        return;
+      }
+
+      await this.sessionRepository.createSession(userId, deviceId);
+
+      console.log(`User ${userId} connected with device ${deviceId}`);
+    } catch (error) {
+      console.error('WebSocket authentication failed:', error.message);
+      client.disconnect();
+    }
   }
+
+  async handleDisconnect(client: Socket) {
+    console.log(`Client disconnected: ${client.id}`);
+
+    await this.sessionRepository.closeSession(client.id);
+  }
+
+  // async handleConnection(socketClient: Socket): Promise<void> {
+  //   this.logger.log(`Client connected: ${socketClient.id}`);
+  //
+  //   // TODO: add database to search for session by user and experations
+  //   // TODO: check for session.exp to be valid
+  //
+  //   //   const clientData =
+  //   //     await this.websocketAuthService.validateClient(socketClient);
+  //   //   if (!clientData) {
+  //   //     this.logger.warn(`Client validation failed: ${socketClient.id}`);
+  //   //     return;
+  //   //   }
+  //   //
+  //   //   socketClient.data = clientData;
+  //   //   await socketClient.join(clientData.sub);
+  //   //   this.logger.log(`Client ${socketClient.id} joined room ${clientData.sub}`);
+  //   //
+  //   //   if (clientData.client) {
+  //   //     await socketClient.join(clientData.client);
+  //   //     this.logger.log(
+  //   //       `Client ${socketClient.id} joined room ${clientData.client}`,
+  //   //     );
+  //   //   }
+  // }
 
   @SubscribeMessage('nfc-scan')
   async handleNfcScan(
@@ -145,9 +189,5 @@ export class WebsocketGateway {
     } catch (_error) {
       this.logger.error(`Error handling NFC response from ${clientData.sub}`);
     }
-  }
-
-  handleDisconnect(client: Socket) {
-    this.logger.log(`Client disconnected: ${client.id}`);
   }
 }

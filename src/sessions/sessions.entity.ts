@@ -1,33 +1,30 @@
 import {
-  Column,
-  CreateDateColumn,
   Entity,
   PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
   UpdateDateColumn,
 } from 'typeorm';
 
-@Entity()
+@Entity('sessions')
 export class Session {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'uuid' })
-  user_id: string;
+  @Column()
+  userId: string;
 
-  @Column({ nullable: true })
-  connection_id: string;
+  @Column()
+  deviceId: string;
 
-  @Column({ nullable: true })
-  device?: string;
+  @Column()
+  isActive: boolean;
 
-  @Column({ nullable: true })
-  app_type?: string;
+  @CreateDateColumn()
+  createdAt: Date;
 
-  @CreateDateColumn({ type: 'timestamptz' })
-  created_at: Date;
-
-  @UpdateDateColumn({ type: 'timestamptz' })
-  updated_at: Date;
+  @UpdateDateColumn()
+  lastActive: Date;
 
   // @ManyToOne((_type) => User, (user) => user.tasks, { eager: false })
   // @Exclude({

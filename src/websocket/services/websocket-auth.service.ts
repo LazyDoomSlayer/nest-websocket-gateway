@@ -3,10 +3,10 @@ import { Socket } from 'socket.io';
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 
 import { WebSocketClientData } from '../dtos/websocket-client.interface';
-import { WebsocketAuthObjectDto } from '../dtos/websocket-auth.dto';
 
 import { validate } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
+import { WebsocketAuthObjectDto } from 'src/auth/dtos/old-auth.dto';
 
 @Injectable()
 export class WebsocketAuthService {
@@ -16,6 +16,7 @@ export class WebsocketAuthService {
     socketClient: Socket,
   ): Promise<WebSocketClientData | null> {
     try {
+      // TODO: do we need this ?
       this.logger.debug(`Starting validation for client ${socketClient.id}`);
       const websocketAuthObject = socketClient.handshake.auth;
 
